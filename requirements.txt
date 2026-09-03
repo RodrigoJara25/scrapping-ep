@@ -1,0 +1,9 @@
+# Dependencias directas (versiones probadas). Instalar dentro de un venv:
+#   python -m venv .venv
+#   .venv\Scripts\activate        (Windows)   /   source .venv/bin/activate  (Linux/Mac)
+#   pip install -r requirements.txt
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+requests==2.34.2
+beautifulsoup4==4.15.0
+lxml==6.1.3

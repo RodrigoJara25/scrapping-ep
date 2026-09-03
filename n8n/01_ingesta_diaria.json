@@ -1,0 +1,71 @@
+{
+  "name": "El Peruano - Ingesta diaria",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [ { "field": "days", "triggerAtHour": 9 } ] } },
+      "id": "n1", "name": "Cada dia 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": { "url": "http://host.docker.internal:8000/api/normas", "options": {} },
+      "id": "n2", "name": "GET /api/normas",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "normas", "options": {} },
+      "id": "n3", "name": "Separar normas",
+      "type": "n8n-nodes-base.splitOut", "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [
+          { "id": "1",  "name": "registrado_en",     "value": "={{ $now.toISO() }}",                  "type": "string" },
+          { "id": "2",  "name": "fecha_publicacion", "value": "={{ $json.fecha_publicacion }}",       "type": "string" },
+          { "id": "3",  "name": "fecha_texto",       "value": "={{ $json.fecha_publicacion_texto }}", "type": "string" },
+          { "id": "4",  "name": "tipo",              "value": "={{ $json.tipo }}",                    "type": "string" },
+          { "id": "5",  "name": "extraordinaria",    "value": "={{ $json.es_extraordinaria }}",       "type": "string" },
+          { "id": "6",  "name": "entidad",           "value": "={{ $json.entidad }}",                 "type": "string" },
+          { "id": "7",  "name": "resolucion",        "value": "={{ $json.resolucion }}",              "type": "string" },
+          { "id": "8",  "name": "numero",            "value": "={{ $json.numero }}",                  "type": "string" },
+          { "id": "9",  "name": "sumilla",           "value": "={{ $json.sumilla }}",                 "type": "string" },
+          { "id": "10", "name": "id",                "value": "={{ $json.id }}",                      "type": "string" },
+          { "id": "11", "name": "url_detalle",       "value": "={{ $json.url_detalle }}",             "type": "string" },
+          { "id": "12", "name": "url_pdf_oficial",   "value": "={{ $json.url_pdf_oficial }}",         "type": "string" }
+        ] },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "n4", "name": "Mapear columnas",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "1ElUARBFkw4yDILsTYDX6UfrSp6RHoyTl5uGCf2phMRg", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "Normas", "mode": "name" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [ "id" ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "n5", "name": "Guardar en Sheet (Normas)",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Cada dia 09:00":  { "main": [ [ { "node": "GET /api/normas", "type": "main", "index": 0 } ] ] },
+    "GET /api/normas": { "main": [ [ { "node": "Separar normas", "type": "main", "index": 0 } ] ] },
+    "Separar normas":  { "main": [ [ { "node": "Mapear columnas", "type": "main", "index": 0 } ] ] },
+    "Mapear columnas": { "main": [ [ { "node": "Guardar en Sheet (Normas)", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": {}
+}
