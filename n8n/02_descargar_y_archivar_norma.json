@@ -1,0 +1,123 @@
+{
+  "name": "EP - Descargar y archivar norma",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "s1", "name": "Inicio",
+      "type": "n8n-nodes-base.executeWorkflowTrigger", "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:8000/api/normas/{{ $json.id }}/pdf",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [ { "name": "tipo", "value": "={{ $json.tipo }}" } ] },
+        "options": { "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } } }
+      },
+      "id": "s2", "name": "Descargar PDF del bot",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $('Inicio').first().json;\nconst slug = String(inp.resolucion || 'NORMA').toUpperCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^A-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);\nconst fecha = String(inp.fecha_publicacion || '').slice(0,10) || new Date().toISOString().slice(0,10);\nreturn [{ json: { id: inp.id, tipo: inp.tipo, resolucion: inp.resolucion || '', fecha_publicacion: fecha, filename: fecha + '__' + slug + '__' + inp.id + '.pdf' }, binary: $input.first().binary }];"
+      },
+      "id": "s3", "name": "Nombre de archivo",
+      "type": "n8n-nodes-base.code", "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.filename }}",
+        "driveId": { "__rl": true, "value": "My Drive", "mode": "list" },
+        "folderId": { "__rl": true, "value": "1xgCPsInswVhS4HhLl8xat6KkwAj4H5yL", "mode": "id" },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "s4", "name": "Subir a Drive",
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": { "__rl": true, "value": "={{ $('Subir a Drive').first().json.id }}", "mode": "id" },
+        "permissionsUi": { "permissionsValues": { "role": "reader", "type": "anyone" } },
+        "options": {}
+      },
+      "id": "s5", "name": "Link publico",
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "1ElUARBFkw4yDILsTYDX6UfrSp6RHoyTl5uGCf2phMRg", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Descargas", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "fecha_solicitud": "={{ $now.toISO() }}",
+            "id": "={{ $('Nombre de archivo').first().json.id }}",
+            "tipo": "={{ $('Nombre de archivo').first().json.tipo }}",
+            "resolucion": "={{ $('Nombre de archivo').first().json.resolucion }}",
+            "fecha_publicacion": "={{ $('Nombre de archivo').first().json.fecha_publicacion }}",
+            "archivo": "={{ $('Nombre de archivo').first().json.filename }}",
+            "pdf_link": "=https://drive.google.com/file/d/{{ $('Subir a Drive').first().json.id }}/view",
+            "resumen": ""
+          }
+        },
+        "options": {}
+      },
+      "id": "s6", "name": "Log en Descargas",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "1ElUARBFkw4yDILsTYDX6UfrSp6RHoyTl5uGCf2phMRg", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Normas", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [ "id" ],
+          "value": {
+            "id": "={{ $('Nombre de archivo').first().json.id }}",
+            "estado": "descargado",
+            "pdf_link": "=https://drive.google.com/file/d/{{ $('Subir a Drive').first().json.id }}/view",
+            "fecha_descarga": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "s7", "name": "Marcar en Normas",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [
+          { "id": "1", "name": "ok", "value": "true", "type": "boolean" },
+          { "id": "2", "name": "id", "value": "={{ $('Nombre de archivo').first().json.id }}", "type": "string" },
+          { "id": "3", "name": "archivo", "value": "={{ $('Nombre de archivo').first().json.filename }}", "type": "string" },
+          { "id": "4", "name": "pdf_link", "value": "=https://drive.google.com/file/d/{{ $('Subir a Drive').first().json.id }}/view", "type": "string" }
+        ] },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "s8", "name": "Respuesta al agente",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4,
+      "position": [1540, 0]
+    }
+  ],
+  "connections": {
+    "Inicio": { "main": [ [ { "node": "Descargar PDF del bot", "type": "main", "index": 0 } ] ] },
+    "Descargar PDF del bot": { "main": [ [ { "node": "Nombre de archivo", "type": "main", "index": 0 } ] ] },
+    "Nombre de archivo": { "main": [ [ { "node": "Subir a Drive", "type": "main", "index": 0 } ] ] },
+    "Subir a Drive": { "main": [ [ { "node": "Link publico", "type": "main", "index": 0 } ] ] },
+    "Link publico": { "main": [ [ { "node": "Log en Descargas", "type": "main", "index": 0 } ] ] },
+    "Log en Descargas": { "main": [ [ { "node": "Marcar en Normas", "type": "main", "index": 0 } ] ] },
+    "Marcar en Normas": { "main": [ [ { "node": "Respuesta al agente", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": {}
+}

@@ -181,6 +181,40 @@ ElPeruano/
 └── requirements.txt
 ```
 
+## Despliegue (API pública con HTTPS)
+
+### Opción A — Render.com (recomendada, no depende de tu PC)
+
+1. Sube el repo a GitHub.
+2. En <https://render.com> → **New + → Blueprint** → conecta este repo (detecta `render.yaml`).
+   O bien **New + → Web Service** manual:
+   - Build: `pip install -r requirements.txt`
+   - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Health check path: `/health`
+   - Plan: Free
+3. Te queda una URL tipo `https://bot-el-peruano.onrender.com`.
+   Prueba: `https://bot-el-peruano.onrender.com/api/normas`
+4. En los workflows de n8n, cambia `http://host.docker.internal:8000` por esa URL.
+
+> Plan free: la instancia "duerme" tras 15 min sin tráfico; la primera llamada
+> tras dormir tarda ~50 s. Para una consulta al día es irrelevante.
+
+### Opción B — ngrok (instantáneo, pero solo mientras tu PC esté encendida)
+
+```bash
+ngrok http 8000
+```
+
+Copia la URL `https://xxxx.ngrok-free.app` que te muestra. Requiere cuenta
+gratuita y `ngrok config add-authtoken <token>` la primera vez. El bot debe
+estar corriendo (`python run.py`).
+
+### Nota de seguridad
+
+La API no tiene autenticación: al publicarla, cualquiera con la URL puede
+consultarla. Como solo expone información pública de El Peruano el riesgo es
+bajo, pero si quieres cerrarla se puede añadir una cabecera `X-API-Key`.
+
 ## Notas
 
 - El scraping depende del HTML de El Peruano; si cambian su web habrá que ajustar

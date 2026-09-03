@@ -1,0 +1,11 @@
+# Blueprint de Render.com  —  https://render.com/docs/blueprint-spec
+# En Render:  New +  ->  Blueprint  ->  conecta este repo.
+services:
+  - type: web
+    name: bot-el-peruano
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
