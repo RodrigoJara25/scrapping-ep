@@ -31,6 +31,11 @@ class Norma(BaseModel):
     es_extraordinaria: bool = Field(
         False, description="True si pertenece a una edicion extraordinaria"
     )
+    es_publicacion_digital: bool = Field(
+        False,
+        description="True si es una 'Publicacion Digital' (municipalidades, etc.); "
+        "el detalle y el PDF se obtienen igual con /api/normas/{id}",
+    )
     url_detalle: str = Field("", description="URL publica con el detalle de la norma")
     url_pdf_oficial: str = Field(
         "", description="URL publica del visor de PDF en busquedas.elperuano.pe"

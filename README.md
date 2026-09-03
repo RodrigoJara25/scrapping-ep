@@ -87,6 +87,7 @@ curl "http://127.0.0.1:8000/api/normas?fecha=2026-09-03"
       "fecha_publicacion_texto": "03/09/2026",
       "sumilla": "Designan Director de Programa Sectorial II ...",
       "es_extraordinaria": false,
+      "es_publicacion_digital": false,
       "url_detalle": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1",
       "url_pdf_oficial": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1/pdf",
       "url_portada": "https://elperuano.pe/.../2550147-1_Portada.jpg",

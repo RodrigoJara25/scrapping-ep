@@ -22,6 +22,7 @@ proteccion anti-bot que bloquee las peticiones server-side.
 
 from __future__ import annotations
 
+import base64
 import re
 from datetime import date, datetime, timezone
 
@@ -86,6 +87,9 @@ _RE_DISPOSITIVO = re.compile(r"/dispositivo/([A-Za-z]+)/([0-9]+-[0-9]+)")
 _RE_TOKEN = re.compile(r"archivo/(?:file|thumbnail)/([A-Za-z0-9_\-]{10,})/")
 _RE_NUMERO = re.compile(r"N[°ºͦº°]\s*([A-Za-z0-9\-./]+)")
 _RE_WS = re.compile(r"\s+")
+_RE_ID_PORTADA = re.compile(r"/([0-9]+-[0-9]+)_Portada", re.IGNORECASE)
+_RE_ID_SIMPLE = re.compile(r"^([0-9]+-[0-9]+)")
+_RE_PUB_DIGITAL = re.compile(r"public\w*\s+digital", re.IGNORECASE)
 
 
 def _limpiar(texto: str) -> str:
@@ -108,8 +112,32 @@ def _extraer_numero(resolucion: str) -> str:
     return m.group(1).strip(" .-") if m else ""
 
 
+def _id_publicacion_digital(art) -> str:
+    """Saca el id de una norma de 'Publicacion Digital' (article ..._dig),
+    cuyo enlace no apunta a /dispositivo/ sino a VistaDE.asp."""
+    # 1) imagen de portada:  .../PortadaFull/2026/09/03/2549494-1_Portada.jpg
+    img = art.select_one(".ediciones_pdf img")
+    if img and img.get("src"):
+        mm = _RE_ID_PORTADA.search(img["src"])
+        if mm:
+            return mm.group(1)
+    # 2) parametro Referencias= en base64  ->  "<id><yyyymmdd>"
+    for a in art.select("a[href*='Referencias=']"):
+        mm = re.search(r"Referencias=([A-Za-z0-9+/=]+)", a.get("href", ""))
+        if not mm:
+            continue
+        try:
+            decoded = base64.b64decode(mm.group(1) + "===").decode("latin1")
+        except Exception:  # noqa: BLE001
+            continue
+        mm2 = _RE_ID_SIMPLE.match(decoded)
+        if mm2:
+            return mm2.group(1)
+    return ""
+
+
 def _parse_articulo(art) -> dict | None:
-    """Convierte un <article class="edicionesoficiales_articulos"> en un dict."""
+    """Convierte un <article class="edicionesoficiales_articulos[_dig]"> en un dict."""
     texto_div = art.select_one(".ediciones_texto")
     if texto_div is None:
         return None
@@ -117,11 +145,21 @@ def _parse_articulo(art) -> dict | None:
     enlace = texto_div.select_one("h5 a")
     href = enlace.get("href", "") if enlace else ""
     m = _RE_DISPOSITIVO.search(href)
-    if not m:
-        return None
-    tipo, norma_id = m.group(1).upper(), m.group(2)
+    if m:
+        tipo, norma_id = m.group(1).upper(), m.group(2)
+        es_digital = False
+    else:
+        # Publicacion Digital: el id vive en la portada o en el base64 del enlace
+        norma_id = _id_publicacion_digital(art)
+        if not norma_id:
+            return None
+        tipo = "NL"
+        es_digital = True
 
-    entidad = _limpiar(texto_div.select_one("h4").get_text()) if texto_div.select_one("h4") else ""
+    entidad = _limpiar(texto_div.select_one("h4").get_text(" ")) if texto_div.select_one("h4") else ""
+    if _RE_PUB_DIGITAL.search(entidad):
+        es_digital = True
+        entidad = _limpiar(_RE_PUB_DIGITAL.sub("", entidad))
     resolucion = _limpiar(enlace.get_text()) if enlace else ""
 
     es_extra = texto_div.select_one("strong.extraordinaria") is not None
@@ -166,6 +204,7 @@ def _parse_articulo(art) -> dict | None:
         "fecha_publicacion_texto": fecha_txt,
         "sumilla": sumilla,
         "es_extraordinaria": es_extra,
+        "es_publicacion_digital": es_digital,
         "url_detalle": f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}",
         "url_pdf_oficial": url_pdf_oficial,
         "url_portada": portada,
@@ -178,7 +217,7 @@ def _parse_listado(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     out: list[dict] = []
     vistos: set[tuple[str, str]] = set()
-    for art in soup.select("article.edicionesoficiales_articulos"):
+    for art in soup.select('article[class*="edicionesoficiales_articulos"]'):
         item = _parse_articulo(art)
         if item and (item["tipo"], item["id"]) not in vistos:
             vistos.add((item["tipo"], item["id"]))
