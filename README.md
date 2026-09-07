@@ -178,11 +178,61 @@ ElPeruano/
 │   └── models.py     # modelos Pydantic de la respuesta
 ├── examples/
 │   └── agent_tool.py # cómo llamar la API como tool desde un agente
+├── n8n/              # workflows de n8n (ingesta diaria, descarga, agente)
+├── deploy/
+│   └── bot-elperuano.service   # unit systemd para VM Linux sin Docker
+├── Dockerfile
+├── docker-compose.yml
+├── render.yaml       # despliegue en Render (alternativa pública)
 ├── run.py            # lanzador de uvicorn
 └── requirements.txt
 ```
 
-## Despliegue (API pública con HTTPS)
+## Despliegue en una VM propia (sin hosting externo)
+
+Si la organización no permite plataformas externas (Render, etc.) pero tiene
+máquinas virtuales, el bot corre igual: es una app Python autónoma. Queda como
+**API interna** en la red de la empresa; n8n la llama por la IP/hostname de la VM.
+
+> Requisito: la VM necesita salida a internet hacia `diariooficial.elperuano.pe`
+> y `busquedas.elperuano.pe`. Si hay proxy corporativo, define `HTTP_PROXY` /
+> `HTTPS_PROXY` / `NO_PROXY` como variables de entorno (el bot las respeta sin
+> cambios de código; ver plantillas en `docker-compose.yml` y `deploy/`).
+
+### Opción 1 — Docker en la VM (recomendada)
+
+```bash
+git clone https://github.com/RodrigoJara25/scrapping-ep.git
+cd scrapping-ep
+docker compose up -d --build
+docker compose logs -f bot-elperuano
+```
+
+- API en `http://<ip-de-la-vm>:8000`.
+- Para otros contenedores de la misma red Docker: `http://bot-elperuano:8000`.
+- `restart: unless-stopped` → arranca solo al reiniciar la VM.
+- Actualizar: `git pull && docker compose up -d --build`.
+
+**Si n8n ya corre en Docker en la misma VM:** descomenta el bloque `networks`
+del `docker-compose.yml` (con el nombre real de la red de n8n) y en n8n usa
+`http://bot-elperuano:8000`.
+
+### Opción 2 — Linux sin Docker (systemd)
+
+Ver instrucciones completas en [`deploy/bot-elperuano.service`](deploy/bot-elperuano.service).
+Resumen: `git clone` en `/opt/bot-elperuano`, `venv` + `pip install`, copiar el
+`.service`, `systemctl enable --now bot-elperuano`. El servicio se reinicia solo
+y arranca en el boot.
+
+### HTTPS interno
+
+Normalmente HTTP dentro de la red interna basta. Si la política exige HTTPS,
+pon un reverse proxy delante (nginx / Caddy) o usa el balanceador/ingress de la
+empresa apuntando al puerto 8000.
+
+---
+
+## Despliegue como API pública con HTTPS (alternativa)
 
 ### Opción A — Render.com (recomendada, no depende de tu PC)
 

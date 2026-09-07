@@ -1,0 +1,10 @@
+.venv/
+*.zip
+__pycache__/
+*.pyc
+*.pdf
+.git/
+.gitignore
+n8n/
+*.docx
+.pytest_cache/

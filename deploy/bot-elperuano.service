@@ -1,0 +1,43 @@
+# systemd unit para correr el bot en una VM Linux SIN Docker.
+#
+# Instalacion:
+#   sudo useradd -r -s /usr/sbin/nologin botuser        # usuario sin login
+#   sudo mkdir -p /opt/bot-elperuano
+#   sudo git clone https://github.com/RodrigoJara25/scrapping-ep.git /opt/bot-elperuano
+#   cd /opt/bot-elperuano
+#   sudo python3 -m venv .venv
+#   sudo .venv/bin/pip install -r requirements.txt
+#   sudo chown -R botuser:botuser /opt/bot-elperuano
+#   sudo cp deploy/bot-elperuano.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now bot-elperuano
+#
+# Ver estado / logs:
+#   systemctl status bot-elperuano
+#   journalctl -u bot-elperuano -f
+#
+# Actualizar tras un git pull:
+#   cd /opt/bot-elperuano && sudo git pull && sudo .venv/bin/pip install -r requirements.txt
+#   sudo systemctl restart bot-elperuano
+
+[Unit]
+Description=Bot Normas Legales - El Peruano (API interna)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=botuser
+WorkingDirectory=/opt/bot-elperuano
+Environment=HOST=0.0.0.0
+Environment=PORT=8000
+# Descomenta si la VM sale a internet por proxy corporativo:
+# Environment=HTTPS_PROXY=http://proxy.empresa.local:8080
+# Environment=HTTP_PROXY=http://proxy.empresa.local:8080
+# Environment=NO_PROXY=localhost,127.0.0.1
+ExecStart=/opt/bot-elperuano/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

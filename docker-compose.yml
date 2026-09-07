@@ -1,0 +1,39 @@
+# Despliegue del bot en una VM propia (sin hosting externo).
+#
+#   docker compose up -d --build
+#   docker compose logs -f bot-elperuano
+#
+# La API queda en http://<ip-de-la-vm>:8000  y, para otros contenedores
+# de la misma red Docker, en http://bot-elperuano:8000
+#
+# Si n8n corre en Docker en la MISMA VM, conecta ambos servicios a una
+# red comun (ver bloque 'networks' comentado al final) y en n8n usa la
+# URL  http://bot-elperuano:8000  en lugar de host.docker.internal.
+
+services:
+  bot-elperuano:
+    build: .
+    image: bot-elperuano:latest
+    container_name: bot-elperuano
+    restart: unless-stopped
+    ports:
+      - "8000:8000"          # quita esta linea si solo lo llamas desde otros contenedores
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      # --- Descomenta si la VM sale a internet por un proxy corporativo ---
+      # - HTTP_PROXY=http://proxy.empresa.local:8080
+      # - HTTPS_PROXY=http://proxy.empresa.local:8080
+      # - NO_PROXY=localhost,127.0.0.1,.empresa.local
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+# --- Para compartir red con un n8n ya existente en la misma VM ---
+# networks:
+#   default:
+#     name: n8n_default        # el nombre real de la red de tu compose de n8n
+#     external: true
