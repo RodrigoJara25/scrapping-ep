@@ -176,6 +176,39 @@ Errores: `422` (fecha/tipo/id mal formados), `404` (no existe / sin PDF), `502` 
 
 ---
 
+## 5b. Origen de cada campo (IMPORTANTE para el port)
+
+No todos los campos son de El Peruano. Al portar, respetar esta clasificacion.
+
+### Tal cual del HTML de El Peruano
+`entidad` (h4, sin el sufijo "Publicación Digital") · `resolucion` (texto del
+h5>a) · `sumilla` (el `<p>` descriptivo) · `fecha_publicacion_texto`
+("DD/MM/YYYY" literal) · `url_portada` (img src) · `id` (se **extrae** del href /
+portada, pero el identificador es de ellos) · `titulo` del detalle (h1.sumilla) ·
+`texto_completo` (p.cuerpo unidos).
+
+### De la pagina pero transformado por el bot
+- `fecha_publicacion`: su `DD/MM/YYYY` -> ISO `YYYY-MM-DD`.
+- `numero`: regex `N[°º]\s*([A-Za-z0-9\-./]+)` sobre `resolucion`.
+- `fecha_documento`: regex heuristico sobre el texto del cuerpo. **Puede venir
+  vacio o impreciso** — no es un dato estructurado de El Peruano.
+- `tipo`: `NL`/`EX` sale del href en las regulares; en las **digitales se asume
+  `"NL"`** (funciona en la practica, pero es decision del bot).
+
+### Calculado por el bot (no es un campo de El Peruano)
+`es_extraordinaria` (hay `strong.extraordinaria`) · `es_publicacion_digital`
+(article clase `_dig`) · `total` · `total_extraordinarias` · `n_caracteres`.
+
+### Inventado por el bot (metadata de esta API — ignorar al scrapear)
+- `fecha_consulta`, `fecha_fin`, `generado_en`: metadata de la respuesta.
+- `titulo` en el **listado**: copia de `sumilla` (El Peruano solo da un texto ahi).
+- `url_detalle`, `url_pdf_oficial`: URLs **construidas**. En regulares coinciden
+  con enlaces de la pagina; en digitales las arma el bot (`VistaDE.asp`).
+- `ruta_contenido`, `ruta_pdf`: rutas hacia ESTA API, sin sentido fuera de ella.
+  El port .NET debe regenerarlas con sus propias rutas.
+
+---
+
 ## 6. Stack .NET sugerido
 
 - **ASP.NET Core Minimal API**
