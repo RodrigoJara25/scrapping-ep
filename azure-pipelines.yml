@@ -1,0 +1,64 @@
+# Despliegue a Azure Container Apps desde Azure DevOps.
+#
+# NO requiere Docker en tu equipo: la imagen se compila en el ACR (en la nube)
+# a partir del Dockerfile de este repo, y luego se despliega al Container App.
+#
+# ---------------------------------------------------------------------------
+# Lo que IT debe preparar una sola vez:
+#   1. Un "Service connection" tipo Azure Resource Manager en el proyecto de
+#      Azure DevOps (Project settings -> Service connections), con rol
+#      "Colaborador" sobre el grupo de recursos de abajo.
+#   2. Registrar en la suscripcion los proveedores:
+#        Microsoft.App   y   Microsoft.OperationalInsights
+#   3. Un Azure Container Registry (SKU Basic sirve).
+#   4. Un Container Apps Environment (o permitir que este pipeline lo cree).
+#      Si hay Azure Policy de regiones/recursos, habilitar la region elegida
+#      y el recurso  Microsoft.App/managedEnvironments.
+# ---------------------------------------------------------------------------
+# Ajusta estos valores a los reales de la empresa:
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  azureServiceConnection: 'svc-azure-normas'        # nombre del Service connection (ARM)
+  resourceGroup: 'rg-normas-elperuano'
+  location: 'eastus2'
+  acrName: 'acrnormaselperuano'                     # solo el nombre, sin .azurecr.io
+  containerAppName: 'bot-elperuano'
+  containerAppEnvironment: 'env-normas-elperuano'
+  targetPort: '8000'
+  imageTag: '$(Build.BuildId)'
+
+steps:
+  - task: AzureContainerApps@1
+    displayName: 'Compilar imagen en ACR y desplegar a Container Apps'
+    inputs:
+      azureSubscription: '$(azureServiceConnection)'
+      acrName: '$(acrName)'
+      appSourcePath: '$(Build.SourcesDirectory)'
+      dockerfilePath: 'Dockerfile'
+      imageToBuild: '$(acrName).azurecr.io/bot-elperuano:$(imageTag)'
+      resourceGroup: '$(resourceGroup)'
+      containerAppName: '$(containerAppName)'
+      containerAppEnvironment: '$(containerAppEnvironment)'
+      targetPort: '$(targetPort)'
+      ingress: 'external'
+
+  # Scale-to-zero: que no consuma cuando nadie lo llama.
+  - task: AzureCLI@2
+    displayName: 'Fijar min-replicas=0 / max-replicas=1'
+    inputs:
+      azureSubscription: '$(azureServiceConnection)'
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        az containerapp update \
+          --name "$(containerAppName)" \
+          --resource-group "$(resourceGroup)" \
+          --min-replicas 0 --max-replicas 1
