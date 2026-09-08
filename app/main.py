@@ -163,12 +163,17 @@ def descargar_norma(
         description="'texto' -> JSON con el contenido integro; 'pdf' -> archivo PDF.",
         pattern="^(texto|pdf|json)$",
     ),
+    fecha: str | None = Query(
+        None,
+        description="Solo para 'Publicacion Digital' con formato=pdf: fecha de "
+        "publicacion (YYYY-MM-DD) que viene en el listado. Habilita el enlace directo.",
+    ),
 ):
     tipo = _validar_tipo(tipo)
 
     try:
         if formato == "pdf":
-            contenido, nombre = scraper.descargar_pdf(norma_id, tipo)
+            contenido, nombre = scraper.descargar_pdf(norma_id, tipo, fecha)
             return Response(
                 content=contenido,
                 media_type="application/pdf",
@@ -195,10 +200,15 @@ def descargar_norma(
 def descargar_norma_pdf(
     norma_id: str = Path(..., pattern=r"^\d+-\d+$", examples=["2550147-1"]),
     tipo: str = Query("NL", description="'NL' o 'EX'."),
+    fecha: str | None = Query(
+        None,
+        description="Solo para 'Publicacion Digital': fecha de publicacion "
+        "(YYYY-MM-DD) del listado. Habilita el enlace directo de respaldo.",
+    ),
 ) -> Response:
     tipo = _validar_tipo(tipo)
     try:
-        contenido, nombre = scraper.descargar_pdf(norma_id, tipo)
+        contenido, nombre = scraper.descargar_pdf(norma_id, tipo, fecha)
     except scraper.NormaNoEncontrada as e:
         raise HTTPException(status_code=404, detail=str(e))
     except scraper.ScraperError as e:

@@ -35,6 +35,7 @@ from bs4 import BeautifulSoup
 
 BASE_DIARIO = "https://diariooficial.elperuano.pe"
 BASE_BUSQUEDAS = "https://busquedas.elperuano.pe"
+BASE_EPDOC = "https://epdoc2.elperuano.pe"  # enlace directo a PDF de "Publicacion Digital"
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -184,6 +185,8 @@ def _parse_articulo(art) -> dict | None:
     if img and img.get("src"):
         portada = img["src"]
 
+    fecha_iso = _fecha_iso(fecha_txt)
+
     url_pdf_oficial = ""
     for a in art.select("a.buttonaction"):
         h = a.get("href", "")
@@ -193,6 +196,13 @@ def _parse_articulo(art) -> dict | None:
     if not url_pdf_oficial:
         url_pdf_oficial = f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}/pdf"
 
+    ruta_pdf = f"/api/normas/{norma_id}/pdf?tipo={tipo}"
+    if es_digital and fecha_iso:
+        # Publicacion Digital: enlace directo al PDF (VistaDE.asp con id+fecha en base64)
+        ref = base64.b64encode(f"{norma_id}{fecha_iso.replace('-', '')}".encode()).decode()
+        url_pdf_oficial = f"{BASE_EPDOC}/EpPo/VistaDE.asp?Referencias={ref}"
+        ruta_pdf += f"&fecha={fecha_iso}"
+
     return {
         "id": norma_id,
         "tipo": tipo,
@@ -200,7 +210,7 @@ def _parse_articulo(art) -> dict | None:
         "titulo": sumilla,          # en el listado, el titulo largo y la sumilla coinciden
         "resolucion": resolucion,
         "numero": _extraer_numero(resolucion),
-        "fecha_publicacion": _fecha_iso(fecha_txt),
+        "fecha_publicacion": fecha_iso,
         "fecha_publicacion_texto": fecha_txt,
         "sumilla": sumilla,
         "es_extraordinaria": es_extra,
@@ -209,7 +219,7 @@ def _parse_articulo(art) -> dict | None:
         "url_pdf_oficial": url_pdf_oficial,
         "url_portada": portada,
         "ruta_contenido": f"/api/normas/{norma_id}?tipo={tipo}",
-        "ruta_pdf": f"/api/normas/{norma_id}/pdf?tipo={tipo}",
+        "ruta_pdf": ruta_pdf,
     }
 
 
@@ -363,30 +373,49 @@ def obtener_contenido(norma_id: str, tipo: str = "NL") -> dict:
     }
 
 
-def descargar_pdf(norma_id: str, tipo: str = "NL") -> tuple[bytes, str]:
-    """Descarga el PDF oficial de la norma. Devuelve (contenido, nombre_archivo)."""
+def descargar_pdf(
+    norma_id: str, tipo: str = "NL", fecha: str | None = None
+) -> tuple[bytes, str]:
+    """
+    Descarga el PDF oficial de la norma. Devuelve (contenido, nombre_archivo).
+
+    Camino normal: detalle -> token -> /api/archivo/file (sirve para normas
+    regulares y para casi todas las 'Publicacion Digital').
+
+    Fallback para 'Publicacion Digital': si se pasa `fecha` (YYYY-MM-DD o
+    YYYYMMDD) y el camino normal falla, se arma el enlace directo
+    epdoc2.elperuano.pe/EpPo/VistaDE.asp?Referencias=base64("<id><yyyymmdd>").
+    """
     s = _session()
-    html, tipo_real = _fetch_detalle(norma_id, tipo, s)
+    fecha_compacta = re.sub(r"\D", "", fecha or "")
 
-    m = _RE_TOKEN.search(html)
-    if not m:
-        raise NormaNoEncontrada(
-            f"No se encontro el token de archivo para la norma {norma_id}."
+    try:
+        html, tipo_real = _fetch_detalle(norma_id, tipo, s)
+        m = _RE_TOKEN.search(html)
+        if m:
+            r = s.get(
+                f"{BASE_BUSQUEDAS}/api/archivo/file/{m.group(1)}/*/{norma_id}.PDF",
+                headers={
+                    "Referer": f"{BASE_BUSQUEDAS}/dispositivo/{tipo_real}/{norma_id}/pdf"
+                },
+                timeout=TIMEOUT,
+            )
+            if r.ok and r.content.startswith(b"%PDF"):
+                return r.content, f"{norma_id}.pdf"
+    except NormaNoEncontrada:
+        pass  # se intenta el fallback de abajo
+
+    if len(fecha_compacta) == 8:
+        ref = base64.b64encode(f"{norma_id}{fecha_compacta}".encode()).decode()
+        r = s.get(
+            f"{BASE_EPDOC}/EpPo/VistaDE.asp",
+            params={"Referencias": ref},
+            timeout=TIMEOUT,
         )
-    token = m.group(1)
+        if r.ok and r.content.startswith(b"%PDF"):
+            return r.content, f"{norma_id}.pdf"
 
-    url = f"{BASE_BUSQUEDAS}/api/archivo/file/{token}/*/{norma_id}.PDF"
-    r = s.get(
-        url,
-        headers={"Referer": f"{BASE_BUSQUEDAS}/dispositivo/{tipo_real}/{norma_id}/pdf"},
-        timeout=TIMEOUT,
+    raise NormaNoEncontrada(
+        f"No se pudo obtener el PDF de {norma_id}."
+        + ("" if fecha_compacta else " Si es Publicacion Digital, pasa ?fecha=YYYY-MM-DD.")
     )
-    r.raise_for_status()
-
-    contenido = r.content
-    if not contenido.startswith(b"%PDF"):
-        raise ScraperError(
-            f"La respuesta para {norma_id} no es un PDF valido "
-            f"(content-type={r.headers.get('content-type')})."
-        )
-    return contenido, f"{norma_id}.pdf"

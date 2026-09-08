@@ -109,6 +109,7 @@ Se llama **cuando el usuario elige una norma** del listado.
 |-------------|-------------|
 | `tipo` | `NL` (por defecto) o `EX`. |
 | `formato` | `texto` (por defecto) → JSON con el texto íntegro. `pdf` → archivo PDF. |
+| `fecha` | Solo para normas con `es_publicacion_digital: true`: la `fecha_publicacion` (YYYY-MM-DD) que trae el listado. Habilita el enlace directo de respaldo (`VistaDE.asp`). El listado ya la incluye en `ruta_pdf`. |
 
 **Texto (para resumir / responder preguntas)**
 

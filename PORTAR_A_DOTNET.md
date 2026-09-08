@@ -63,6 +63,22 @@ GET https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}
    ```
 3. Respuesta: `application/pdf`, el cuerpo empieza con `%PDF`. Validar eso.
 
+Este camino sirve para normas regulares **y** para las 'Publicacion Digital'
+(probado 24/24). Si `_dig` alguna vez no tuviera token, usar el fallback E.
+
+### E) PDF directo de 'Publicacion Digital' (fallback)
+El Peruano publica estas con un enlace **directo al PDF** (no al visor):
+```
+GET https://epdoc2.elperuano.pe/EpPo/VistaDE.asp?Referencias={ref}
+```
+donde `ref = base64("<id><yyyymmdd>")`, p. ej. `id=2549494-1`, fecha `2026-09-03`
+-> base64 de `"2549494-120260903"` -> `MjU0OTQ5NC0xMjAyNjA5MDM=`.
+Devuelve `application/pdf; Charset=UTF-8`, cuerpo `%PDF`. Requiere la **fecha de
+publicacion** (viene en el listado). El bot Python expone esto como
+`?fecha=YYYY-MM-DD` en `/api/normas/{id}/pdf` y en el listado ya deja
+`ruta_pdf` con `&fecha=...` y `url_pdf_oficial` apuntando a este enlace directo
+para las digitales.
+
 ---
 
 ## 3. Parseo del fragmento de listado
@@ -174,6 +190,9 @@ Errores: `422` (fecha/tipo/id mal formados), `404` (no existe / sin PDF), `502` 
 - `NL` vs `EX`: probar el dado, si 404 probar el otro.
 - Las publicaciones digitales (`article ..._dig`) **cuentan**: su enlace va a
   `VistaDE.asp`, el `id` sale de la portada o del base64 `Referencias=`.
+  Para su PDF: el camino normal (detalle + token) funciona; el enlace directo
+  `VistaDE.asp?Referencias=base64("<id><yyyymmdd>")` es el fallback y necesita
+  la fecha de publicacion.
 - Entidades HTML + UTF-8.
 - El HTML de El Peruano puede cambiar: mantener la versión Python como oráculo
   para diffear resultados.
