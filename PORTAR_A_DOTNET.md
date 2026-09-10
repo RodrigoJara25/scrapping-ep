@@ -123,6 +123,89 @@ Contenedor: `div.story` (o `#x{id}`).
 
 ---
 
+## 4b. Los 2 endpoints "difíciles" explicados paso a paso
+
+**Ambos se apoyan en la MISMA petición**: la página de detalle
+`GET https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}`.
+Es una SPA de React, pero pedida con un cliente HTTP normal (sin navegador, sin
+JS) devuelve un HTML que **ya trae**: (a) el texto legal completo en marcado
+antiguo, y (b) el token para bajar el PDF. Un solo GET sirve para los dos.
+
+### Endpoint TEXTO — `GET /api/normas/{id}?formato=texto`
+
+El HTML incluye este bloque (marcado simple, sin JS):
+```html
+<div class="story">
+  <h1 class="sumilla">Ordenanza que aprueba la desafectación de uso de suelo </h1>
+  <h1 class="sumilla">en el distrito de Puente Piedra</h1>
+  <h2 class="resoluci-n ...">ORDENANZA N° 2847</h2>
+  <p class="cuerpo ...">EL ALCALDE DE LA MUNICIPALIDAD METROPOLITANA DE LIMA</p>
+  <p class="cuerpo ...">POR CUANTO:</p>
+  <p class="cuerpo ...">El Concejo Metropolitano de Lima, en sesión ...</p>
+  ...
+  <p class="cuerpo"><span class="bold-cuerpo">2549494-1</span></p>   <!-- el id: se descarta -->
+</div>
+```
+Pasos:
+1. Resolver `tipo`: `GET .../dispositivo/{tipo}/{id}`; si 404 → probar el otro
+   (`NL` <-> `EX`). El que dé 200 con `story` / `id="x{id}"` / `resoluci` en el
+   body es el correcto. Header: solo `User-Agent` de navegador.
+2. Dentro de `div.story` (fallback: `#x{id}`, o el documento entero):
+   - `h1.sumilla` (¡pueden ser varios!) → unir textos con espacio → `titulo`/`sumilla`.
+   - `h2.resoluci-n` (1..n) → unir con espacio → `resolucion`.
+   - `p.cuerpo` en orden; **saltar** el `<p>` cuyo texto sea exactamente el `id`;
+     unir el resto con `"\n\n"` → `texto_completo`.
+3. Derivados: `numero` (regex sobre `resolucion`), `fecha_documento` (regex sobre
+   el texto, best-effort), `n_caracteres` = largo de `texto_completo`.
+
+### Endpoint PDF — `GET /api/normas/{id}/pdf`
+
+El PDF **no está en URL predecible**. Se sirve por:
+```
+https://busquedas.elperuano.pe/api/archivo/file/{TOKEN}/*/{id}.PDF
+```
+`{TOKEN}` es una cadena opaca **por documento** (ej. `1QI_zBVxa_KA5zerdoc6Mw`),
+incrustada en el HTML de detalle dentro de un blob de datos del React:
+```
+..."urlPDF","/api/archivo/file/1QI_zBVxa_KA5zerdoc6Mw/*/2549494-1.pdf","urlPDFTupa"...
+```
+Pasos:
+1. Mismo `GET .../dispositivo/{tipo}/{id}` (resolver NL/EX).
+2. Regex sobre el HTML crudo (texto, no DOM):
+   `archivo/(?:file|thumbnail)/([A-Za-z0-9_\-]{10,})/` → grupo 1 = `{TOKEN}`.
+3. `GET https://busquedas.elperuano.pe/api/archivo/file/{TOKEN}/*/{id}.PDF`
+   con header `Referer: https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}/pdf`.
+   El `*` es **literal** (segmento de "versión" que su API acepta como comodín).
+4. Validar: `Content-Type: application/pdf` y que los bytes empiecen con `%PDF`.
+5. Devolver con `Content-Disposition: attachment; filename="{id}.pdf"`.
+
+Fallback digital: si el token falla y hay `fecha` (ver sección E), armar
+`base64("<id><yyyymmdd>")` y `GET .../EpPo/VistaDE.asp?Referencias={ref}`.
+
+**Gotchas:**
+- El `{TOKEN}` **cambia** si El Peruano reprocesa el documento → nunca cachearlo
+  ni hardcodearlo; siempre re-scrapear de la página de detalle.
+- `/dispositivo/{tipo}/{id}/pdf` en navegador = página del visor React, **no** el
+  binario. No la bajes esperando bytes de PDF.
+
+### Ejemplo real (norma `2549494-1`, tipo `NL`)
+```
+# 1) detalle — sirve para TEXTO y PDF
+GET https://busquedas.elperuano.pe/dispositivo/NL/2549494-1
+    -> div.story: resolucion="ORDENANZA N° 2847", texto_completo ~2175 chars
+    -> regex token = 1QI_zBVxa_KA5zerdoc6Mw
+
+# 2) PDF
+GET https://busquedas.elperuano.pe/api/archivo/file/1QI_zBVxa_KA5zerdoc6Mw/*/2549494-1.PDF
+    -> ~412 KB, empieza con %PDF-1.7
+
+# 2b) fallback (misma norma)
+GET https://epdoc2.elperuano.pe/EpPo/VistaDE.asp?Referencias=MjU0OTQ5NC0xMjAyNjA5MDM=
+    -> el mismo PDF
+```
+
+---
+
 ## 5. Modelo de salida (JSON)
 
 ### `GET /api/normas`
