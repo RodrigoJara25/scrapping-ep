@@ -9,3 +9,6 @@ __pycache__/
 .idea/
 .vscode/
 *.log
+
+snapshots/
+tools/snapshots/
