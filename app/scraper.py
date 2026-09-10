@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import base64
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import requests
 from bs4 import BeautifulSoup
@@ -196,18 +196,28 @@ def _parse_articulo(art) -> dict | None:
     if not url_pdf_oficial:
         url_pdf_oficial = f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}/pdf"
 
-    ruta_pdf = f"/api/normas/{norma_id}/pdf?tipo={tipo}"
+    ruta_pdf = f"/api/Agente/norma/{norma_id}/pdf?tipo={tipo}"
     if es_digital and fecha_iso:
         # Publicacion Digital: enlace directo al PDF (VistaDE.asp con id+fecha en base64)
         ref = base64.b64encode(f"{norma_id}{fecha_iso.replace('-', '')}".encode()).decode()
         url_pdf_oficial = f"{BASE_EPDOC}/EpPo/VistaDE.asp?Referencias={ref}"
         ruta_pdf += f"&fecha={fecha_iso}"
 
+    # Enlace al cuadernillo completo del dia (boton "Todo el cuadernillo").
+    url_cuadernillo = ""
+    for a in art.select("a.buttonaction"):
+        h = a.get("href", "")
+        if "/cuadernillo/" in h:
+            url_cuadernillo = h
+            break
+    if not url_cuadernillo:
+        url_cuadernillo = f"{BASE_BUSQUEDAS}/cuadernillo/{tipo}/{fecha_iso.replace('-', '')}"
+
     return {
         "id": norma_id,
         "tipo": tipo,
         "entidad": entidad,
-        "titulo": sumilla,          # en el listado, el titulo largo y la sumilla coinciden
+        "titulo": resolucion,       # en el listado el titulo es la denominacion de la resolucion
         "resolucion": resolucion,
         "numero": _extraer_numero(resolucion),
         "fecha_publicacion": fecha_iso,
@@ -217,8 +227,9 @@ def _parse_articulo(art) -> dict | None:
         "es_publicacion_digital": es_digital,
         "url_detalle": f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}",
         "url_pdf_oficial": url_pdf_oficial,
+        "url_cuadernillo": url_cuadernillo,
         "url_portada": portada,
-        "ruta_contenido": f"/api/normas/{norma_id}?tipo={tipo}",
+        "ruta_contenido": f"/api/Agente/norma/{norma_id}/contenido?tipo={tipo}",
         "ruta_pdf": ruta_pdf,
     }
 
@@ -288,12 +299,17 @@ def listar_normas(
         fecha_consulta = fecha.isoformat()
         fecha_fin_iso = (fecha_fin or fecha).isoformat() if fecha_fin else None
 
+    # Sin rango explicito, fecha_fin toma el valor de fecha_consulta (nunca null).
+    fecha_fin_iso = fecha_fin_iso or fecha_consulta
+    # generado_en en hora de Peru (UTC-5, sin horario de verano), precision de segundos.
+    generado_en = datetime.now(timezone(timedelta(hours=-5))).isoformat(timespec="seconds")
+
     return {
         "fecha_consulta": fecha_consulta,
         "fecha_fin": fecha_fin_iso,
         "total": len(normas),
         "total_extraordinarias": sum(1 for n in normas if n["es_extraordinaria"]),
-        "generado_en": datetime.now(timezone.utc).isoformat(),
+        "generado_en": generado_en,
         "normas": normas,
     }
 

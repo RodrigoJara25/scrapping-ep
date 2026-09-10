@@ -70,36 +70,50 @@ curl "http://127.0.0.1:8000/api/normas?fecha=2026-09-03"
 
 ```jsonc
 {
-  "fecha_consulta": "2026-09-03",
-  "fecha_fin": null,
-  "total": 83,
-  "total_extraordinarias": 0,
-  "generado_en": "2026-09-03T15:04:05+00:00",
-  "normas": [
-    {
-      "id": "2550147-1",
-      "tipo": "NL",
-      "entidad": "CULTURA",
-      "titulo": "Designan Director de Programa Sectorial II ...",
-      "resolucion": "RESOLUCIÓN MINISTERIAL N° 000318-2026-MC",
-      "numero": "000318-2026-MC",
-      "fecha_publicacion": "2026-09-03",
-      "fecha_publicacion_texto": "03/09/2026",
-      "sumilla": "Designan Director de Programa Sectorial II ...",
-      "es_extraordinaria": false,
-      "es_publicacion_digital": false,
-      "url_detalle": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1",
-      "url_pdf_oficial": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1/pdf",
-      "url_portada": "https://elperuano.pe/.../2550147-1_Portada.jpg",
-      "ruta_contenido": "/api/normas/2550147-1?tipo=NL",
-      "ruta_pdf": "/api/normas/2550147-1/pdf?tipo=NL"
-    }
-  ]
+  "statusCode": 200,
+  "success": true,
+  "message": null,
+  "data": {
+    "fechaConsulta": "2026-09-03",
+    "fechaFin": "2026-09-03",
+    "total": 88,
+    "totalExtraordinarias": 0,
+    "generadoEn": "2026-09-03T15:04:05-05:00",
+    "normas": [
+      {
+        "id": "2550147-1",
+        "tipo": "NL",
+        "entidad": "CULTURA",
+        "titulo": "RESOLUCIÓN MINISTERIAL N° 000318-2026-MC",
+        "resolucion": "RESOLUCIÓN MINISTERIAL N° 000318-2026-MC",
+        "numero": "000318-2026-MC",
+        "fechaPublicacion": "2026-09-03",
+        "fechaPublicacionTexto": "03/09/2026",
+        "sumilla": "Designan Director de Programa Sectorial II ...",
+        "esExtraordinaria": false,
+        "esPublicacionDigital": false,
+        "urlDetalle": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1",
+        "urlPdfOficial": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1/pdf",
+        "urlCuadernillo": "https://busquedas.elperuano.pe/cuadernillo/NL/20260903",
+        "urlPortada": "https://elperuano.pe/.../2550147-1_Portada.jpg",
+        "rutaContenido": "/api/Agente/norma/2550147-1/contenido?tipo=NL",
+        "rutaPdf": "/api/Agente/norma/2550147-1/pdf?tipo=NL"
+      }
+    ]
+  }
 }
 ```
 
-`ruta_contenido` y `ruta_pdf` vienen listas para que el agente encadene la
-descarga individual sin construir URLs a mano.
+Notas de esta respuesta:
+
+- La respuesta va envuelta en `{ statusCode, success, message, data }`. Los errores
+  (422 / 502) siguen devolviéndose como `{"detail": "..."}` con su HTTP status.
+- `titulo` = `resolucion` (denominación de la norma). El texto descriptivo va en `sumilla`.
+- `fechaFin` toma el valor de `fechaConsulta` cuando no se pasa un rango.
+- `generadoEn` en hora de Perú (UTC-5).
+- `rutaContenido` / `rutaPdf` apuntan a las rutas del servicio consumidor
+  (`/api/Agente/norma/...`). En publicaciones digitales, `rutaPdf` incluye
+  `&fecha=YYYY-MM-DD` (lo necesita la descarga del PDF de esas municipales).
 
 ### 2) `GET /api/normas/{norma_id}` — descarga individual
 

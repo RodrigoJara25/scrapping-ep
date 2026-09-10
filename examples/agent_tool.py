@@ -135,9 +135,10 @@ DISPATCH = {
 
 def _demo() -> None:
     print("1) Consultando normas del día...")
-    data = listar_normas()
-    print(f"   {data['total']} normas para {data['fecha_consulta']} "
-          f"({data['total_extraordinarias']} extraordinarias)\n")
+    resp = listar_normas()
+    data = resp["data"]  # respuesta envuelta: { statusCode, success, message, data }
+    print(f"   {data['total']} normas para {data['fechaConsulta']} "
+          f"({data['totalExtraordinarias']} extraordinarias)\n")
 
     for i, n in enumerate(data["normas"][:10], 1):
         print(f"   [{i}] {n['entidad']} — {n['resolucion']}")

@@ -208,35 +208,56 @@ GET https://epdoc2.elperuano.pe/EpPo/VistaDE.asp?Referencias=MjU0OTQ5NC0xMjAyNjA
 
 ## 5. Modelo de salida (JSON)
 
-### `GET /api/normas`
+### `GET /api/normas`  (respuesta EXACTA que exige producción)
+
+Envuelta en `{ statusCode, success, message, data }`. Nombres en camelCase,
+respetando mayúsculas/minúsculas. Errores (422/502) NO se envuelven: siguen como
+`{"detail": "..."}` con su HTTP status.
+
 ```jsonc
 {
-  "fecha_consulta": "2026-09-08",
-  "fecha_fin": null,
-  "total": 88,
-  "total_extraordinarias": 0,
-  "generado_en": "2026-09-08T15:04:05Z",
-  "normas": [
-    {
-      "id": "2550147-1", "tipo": "NL",
-      "entidad": "CULTURA",
-      "titulo": "Designan Director ...",
-      "resolucion": "RESOLUCIÓN MINISTERIAL N° 000318-2026-MC",
-      "numero": "000318-2026-MC",
-      "fecha_publicacion": "2026-09-08",
-      "fecha_publicacion_texto": "08/09/2026",
-      "sumilla": "Designan Director ...",
-      "es_extraordinaria": false,
-      "es_publicacion_digital": false,
-      "url_detalle": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1",
-      "url_pdf_oficial": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1/pdf",
-      "url_portada": "https://elperuano.pe/.../2550147-1_Portada.jpg",
-      "ruta_contenido": "/api/normas/2550147-1?tipo=NL",
-      "ruta_pdf": "/api/normas/2550147-1/pdf?tipo=NL"
-    }
-  ]
+  "statusCode": 200,
+  "success": true,
+  "message": null,
+  "data": {
+    "fechaConsulta": "2026-09-10",
+    "fechaFin": "2026-09-10",
+    "total": 1,
+    "totalExtraordinarias": 0,
+    "generadoEn": "2026-09-10T14:40:20-05:00",
+    "normas": [
+      {
+        "id": "2552687-1",
+        "tipo": "NL",
+        "entidad": "AMBIENTE",
+        "titulo": "RESOLUCIÓN N° 038-2026-SENAMHI/JF",
+        "resolucion": "RESOLUCIÓN N° 038-2026-SENAMHI/JF",
+        "numero": "038-2026-SENAMHI/JF",
+        "fechaPublicacion": "2026-09-10",
+        "fechaPublicacionTexto": "10/09/2026",
+        "sumilla": "Descripción de la norma",
+        "esExtraordinaria": false,
+        "esPublicacionDigital": false,
+        "urlDetalle": "https://busquedas.elperuano.pe/dispositivo/NL/2552687-1",
+        "urlPdfOficial": "https://busquedas.elperuano.pe/dispositivo/NL/2552687-1/pdf",
+        "urlCuadernillo": "https://busquedas.elperuano.pe/cuadernillo/NL/20260910",
+        "urlPortada": "https://elperuano.pe/NormasElperuano/PortadaFull/2026/09/10/2552687-1_Portada.jpg",
+        "rutaContenido": "/api/Agente/norma/2552687-1/contenido?tipo=NL",
+        "rutaPdf": "/api/Agente/norma/2552687-1/pdf?tipo=NL"
+      }
+    ]
+  }
 }
 ```
+
+Reglas de esta respuesta:
+- `titulo` = `resolucion` (denominación). El texto descriptivo va en `sumilla`.
+- `fechaFin` = `fechaConsulta` cuando no hay rango explícito (nunca null).
+- `generadoEn` en hora de Perú (UTC-5), precisión de segundos.
+- `urlCuadernillo` = `https://busquedas.elperuano.pe/cuadernillo/{tipo}/{yyyymmdd}`
+  (se toma del botón "Todo el cuadernillo" del listado; si no está, se construye).
+- `rutaContenido` / `rutaPdf` apuntan al servicio consumidor (`/api/Agente/norma/...`).
+  En publicaciones digitales, `rutaPdf` lleva además `&fecha=YYYY-MM-DD`.
 
 ### `GET /api/normas/{id}?formato=texto`
 ```jsonc

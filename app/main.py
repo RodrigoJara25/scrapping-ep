@@ -27,7 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import __version__, scraper
-from .models import ContenidoNorma, ListadoNormas, Norma
+from .models import ContenidoNorma, DataListado, NormaItem, RespuestaListado
 
 app = FastAPI(
     title="Bot Normas Legales - El Peruano",
@@ -96,7 +96,7 @@ def health() -> dict:
 
 @app.get(
     "/api/normas",
-    response_model=ListadoNormas,
+    response_model=RespuestaListado,
     tags=["normas"],
     summary="Listar normas legales (del dia, de una fecha o de un rango)",
 )
@@ -112,7 +112,7 @@ def listar_normas(
         description="Opcional. Fin del rango (YYYY-MM-DD). Requiere 'fecha'.",
         examples=["2026-09-03"],
     ),
-) -> ListadoNormas:
+) -> RespuestaListado:
     d_ini = _parse_fecha(fecha, "fecha")
     d_fin = _parse_fecha(fecha_fin, "fecha_fin")
     if d_fin and not d_ini:
@@ -125,13 +125,41 @@ def listar_normas(
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Error consultando El Peruano: {e}")
 
-    return ListadoNormas(
-        fecha_consulta=data["fecha_consulta"],
-        fecha_fin=data["fecha_fin"],
-        total=data["total"],
-        total_extraordinarias=data["total_extraordinarias"],
-        generado_en=data["generado_en"],
-        normas=[Norma(**n) for n in data["normas"]],
+    normas = [
+        NormaItem(
+            id=n["id"],
+            tipo=n["tipo"],
+            entidad=n["entidad"],
+            titulo=n["titulo"],
+            resolucion=n["resolucion"],
+            numero=n["numero"],
+            fechaPublicacion=n["fecha_publicacion"],
+            fechaPublicacionTexto=n["fecha_publicacion_texto"],
+            sumilla=n["sumilla"],
+            esExtraordinaria=n["es_extraordinaria"],
+            esPublicacionDigital=n["es_publicacion_digital"],
+            urlDetalle=n["url_detalle"],
+            urlPdfOficial=n["url_pdf_oficial"],
+            urlCuadernillo=n["url_cuadernillo"],
+            urlPortada=n["url_portada"],
+            rutaContenido=n["ruta_contenido"],
+            rutaPdf=n["ruta_pdf"],
+        )
+        for n in data["normas"]
+    ]
+
+    return RespuestaListado(
+        statusCode=200,
+        success=True,
+        message=None,
+        data=DataListado(
+            fechaConsulta=data["fecha_consulta"],
+            fechaFin=data["fecha_fin"],
+            total=data["total"],
+            totalExtraordinarias=data["total_extraordinarias"],
+            generadoEn=data["generado_en"],
+            normas=normas,
+        ),
     )
 
 
