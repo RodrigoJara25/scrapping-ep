@@ -53,6 +53,12 @@ GET https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}
 ```
 - `tipo` incorrecto → HTTP 404 → reintentar con el otro (`NL` <-> `EX`).
 - La respuesta es una página HTML; la parte útil es `<div class="story">`.
+- ⚠️ **Para mas de la mitad de las 'Publicacion Digital', esta pagina NO EXISTE**
+  (da 404 con `NL` **y** con `EX` — no es un problema de tipo equivocado, la
+  pagina simplemente no esta). Medido: 8 de 14 en una muestra de 8 dias, en
+  varias entidades (ONP, Relaciones Exteriores, municipalidades). Para esas
+  normas **no hay texto/HTML extraible en absoluto**, solo existe el PDF (ir a
+  D/E). No es un bug del scraper: el dato no esta publicado como texto.
 
 ### D) PDF
 1. Del HTML de C, extraer el token con regex:
@@ -63,10 +69,11 @@ GET https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}
    ```
 3. Respuesta: `application/pdf`, el cuerpo empieza con `%PDF`. Validar eso.
 
-Este camino sirve para normas regulares **y** para las 'Publicacion Digital'
-(probado 24/24). Si `_dig` alguna vez no tuviera token, usar el fallback E.
+Este camino sirve para normas regulares y para las 'Publicacion Digital' que
+**sí** tienen pagina de detalle (ver aviso de C). Si C dio 404 en ambos tipos,
+no hay token que extraer: usar directamente el fallback E.
 
-### E) PDF directo de 'Publicacion Digital' (fallback)
+### E) PDF directo de 'Publicacion Digital' (fallback — y a veces el UNICO camino)
 El Peruano publica estas con un enlace **directo al PDF** (no al visor):
 ```
 GET https://epdoc2.elperuano.pe/EpPo/VistaDE.asp?Referencias={ref}
@@ -74,10 +81,19 @@ GET https://epdoc2.elperuano.pe/EpPo/VistaDE.asp?Referencias={ref}
 donde `ref = base64("<id><yyyymmdd>")`, p. ej. `id=2549494-1`, fecha `2026-09-03`
 -> base64 de `"2549494-120260903"` -> `MjU0OTQ5NC0xMjAyNjA5MDM=`.
 Devuelve `application/pdf; Charset=UTF-8`, cuerpo `%PDF`. Requiere la **fecha de
-publicacion** (viene en el listado). El bot Python expone esto como
-`?fecha=YYYY-MM-DD` en `/api/normas/{id}/pdf` y en el listado ya deja
-`ruta_pdf` con `&fecha=...` y `url_pdf_oficial` apuntando a este enlace directo
-para las digitales.
+publicacion** (viene en el listado). **Este enlace siempre funciona**, tenga o
+no pagina de detalle la norma — por eso, para 'Publicacion Digital', tanto
+`url_detalle` como `url_pdf_oficial` deben apuntar aqui (nunca al
+`/dispositivo/...` construido, que puede no existir).
+
+El bot Python expone esto como `?fecha=YYYY-MM-DD` en `/api/normas/{id}/pdf`,
+y en el listado ya deja `ruta_pdf` con `&fecha=...`.
+
+**Importante para el endpoint de texto:** cuando una norma no tiene pagina de
+detalle (aviso de C), el endpoint `GET /api/normas/{id}?formato=texto` **debe
+devolver 404** con un mensaje que aclare que no hay version HTML/texto y que
+se use `formato=pdf` — no un genérico "no encontrada" que sugiera que la norma
+no existe (sí existe, solo que sin texto extraible).
 
 ---
 
@@ -101,8 +117,15 @@ Por cada `<article>`:
 | `sumilla` | el/los `<p>` de `.ediciones_texto` que **no** son el de "Fecha:" | unir con espacio |
 | `numero` | de `resolucion` | regex `N[°º]\s*([A-Za-z0-9\-./]+)` |
 | `url_portada` | `.ediciones_pdf img[src]` | tal cual |
-| `url_detalle` | construido | `https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}` |
-| `url_pdf_oficial` | construido | `{url_detalle}/pdf` |
+| `url_detalle` | construido | `https://busquedas.elperuano.pe/dispositivo/{tipo}/{id}` — **excepto en 'Publicacion Digital', ver aviso abajo** |
+| `url_pdf_oficial` | construido | `{url_detalle}/pdf` — **excepto en 'Publicacion Digital', ver seccion E** |
+
+> ⚠️ **Mas de la mitad de las 'Publicacion Digital' NO tienen pagina `/dispositivo/{tipo}/{id}`**
+> (da 404 real en El Peruano; medido: 8 de 14 en una muestra de 8 dias). Para esas,
+> `url_detalle` y `url_pdf_oficial` deben ser el enlace directo `VistaDE.asp` de la
+> seccion E (el mismo para ambos campos), **no** el link `/dispositivo/...` construido.
+> Ese enlace directo SI funciona siempre (con o sin pagina de detalle). El texto/HTML
+> tampoco existe para esas normas: solo hay PDF.
 
 Decodificar entidades HTML (`&#211;` → `Ó`, etc.) — cualquier parser HTML serio lo hace. Salida en **UTF-8**.
 
@@ -307,9 +330,15 @@ portada, pero el identificador es de ellos) · `titulo` del detalle (h1.sumilla)
 
 ### Inventado por el bot (metadata de esta API — ignorar al scrapear)
 - `fecha_consulta`, `fecha_fin`, `generado_en`: metadata de la respuesta.
-- `titulo` en el **listado**: copia de `sumilla` (El Peruano solo da un texto ahi).
-- `url_detalle`, `url_pdf_oficial`: URLs **construidas**. En regulares coinciden
-  con enlaces de la pagina; en digitales las arma el bot (`VistaDE.asp`).
+- `titulo` en el **listado**: copia de `resolucion` (la denominacion; el texto
+  descriptivo real queda en `sumilla`).
+- `url_detalle`, `url_pdf_oficial`: URLs **construidas**.
+  - En normas **regulares**: `url_detalle` coincide con el enlace de la pagina
+    (`/dispositivo/{tipo}/{id}`) y `url_pdf_oficial` es ese mismo `+ /pdf`.
+  - En **'Publicacion Digital'**: **ambos campos son iguales** y apuntan al
+    enlace directo `VistaDE.asp` (seccion E) — **nunca** al `/dispositivo/...`
+    construido, porque mas de la mitad de esas normas no tienen esa pagina
+    (da 404 real). Verificalo con una peticion antes de asumir que existe.
 - `ruta_contenido`, `ruta_pdf`: rutas hacia ESTA API, sin sentido fuera de ella.
   El port .NET debe regenerarlas con sus propias rutas.
 
@@ -329,9 +358,11 @@ portada, pero el identificador es de ellos) · `titulo` del detalle (h1.sumilla)
 - `NL` vs `EX`: probar el dado, si 404 probar el otro.
 - Las publicaciones digitales (`article ..._dig`) **cuentan**: su enlace va a
   `VistaDE.asp`, el `id` sale de la portada o del base64 `Referencias=`.
-  Para su PDF: el camino normal (detalle + token) funciona; el enlace directo
-  `VistaDE.asp?Referencias=base64("<id><yyyymmdd>")` es el fallback y necesita
-  la fecha de publicacion.
+  **Mas de la mitad no tienen pagina `/dispositivo/{tipo}/{id}` (404 real, en
+  NL y EX)** — para esas, `url_detalle` y `url_pdf_oficial` deben ser el
+  enlace directo `VistaDE.asp?Referencias=base64("<id><yyyymmdd>")` (necesita
+  la fecha de publicacion), y el endpoint de texto debe devolver 404 con un
+  mensaje claro (no hay HTML, solo PDF) — no un "no encontrada" generico.
 - Entidades HTML + UTF-8.
 - El HTML de El Peruano puede cambiar: mantener la versión Python como oráculo
   para diffear resultados.

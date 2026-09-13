@@ -117,6 +117,12 @@ Notas de esta respuesta:
   esté corriendo (local, Render, la VM, etc.). En publicaciones digitales,
   `rutaPdf` incluye además `&fecha=YYYY-MM-DD` (lo necesita la descarga del PDF
   de esas municipales).
+- **Publicaciones digitales sin página de detalle:** más de la mitad de las
+  `esPublicacionDigital: true` no tienen página `/dispositivo/{tipo}/{id}` en
+  El Peruano (da 404 real). Para esas, `urlDetalle` y `urlPdfOficial` son el
+  mismo enlace directo al PDF (`VistaDE.asp`), y `rutaContenido` (formato=texto)
+  devuelve **404** porque no existe texto/HTML para esa norma — solo el PDF.
+  No es un bug: el dato no está publicado como texto.
 
 ### 2) `GET /api/normas/{norma_id}` — descarga individual
 

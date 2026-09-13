@@ -196,11 +196,17 @@ def _parse_articulo(art) -> dict | None:
     if not url_pdf_oficial:
         url_pdf_oficial = f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}/pdf"
 
+    url_detalle = f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}"
+
     ruta_pdf = f"/api/normas/{norma_id}/pdf?tipo={tipo}"
     if es_digital and fecha_iso:
-        # Publicacion Digital: enlace directo al PDF (VistaDE.asp con id+fecha en base64)
+        # Publicacion Digital: enlace directo al PDF (VistaDE.asp con id+fecha en base64).
+        # Muchas 'Publicacion Digital' (mas de la mitad, medido) NO tienen pagina
+        # /dispositivo/{tipo}/{id} en El Peruano (da 404 real); el enlace VistaDE
+        # si funciona siempre, asi que tambien lo usamos como url_detalle.
         ref = base64.b64encode(f"{norma_id}{fecha_iso.replace('-', '')}".encode()).decode()
         url_pdf_oficial = f"{BASE_EPDOC}/EpPo/VistaDE.asp?Referencias={ref}"
+        url_detalle = url_pdf_oficial
         ruta_pdf += f"&fecha={fecha_iso}"
 
     # Enlace al cuadernillo completo del dia (boton "Todo el cuadernillo").
@@ -225,7 +231,7 @@ def _parse_articulo(art) -> dict | None:
         "sumilla": sumilla,
         "es_extraordinaria": es_extra,
         "es_publicacion_digital": es_digital,
-        "url_detalle": f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}",
+        "url_detalle": url_detalle,
         "url_pdf_oficial": url_pdf_oficial,
         "url_cuadernillo": url_cuadernillo,
         "url_portada": portada,
@@ -331,7 +337,12 @@ def _fetch_detalle(norma_id: str, tipo: str, s: requests.Session) -> tuple[str, 
             ultimo_error = e
     if ultimo_error:
         raise NormaNoEncontrada(f"No se pudo obtener la norma {norma_id}: {ultimo_error}")
-    raise NormaNoEncontrada(f"Norma {norma_id} no encontrada (tipos probados: {orden}).")
+    raise NormaNoEncontrada(
+        f"La norma {norma_id} no tiene pagina de detalle/HTML en El Peruano "
+        f"(tipos probados: {orden}; da 404). Es habitual en 'Publicacion Digital': "
+        f"no hay texto extraible, pero el PDF si esta disponible via "
+        f"formato=pdf (o /pdf) pasando 'fecha' si hace falta."
+    )
 
 
 def obtener_contenido(norma_id: str, tipo: str = "NL") -> dict:
