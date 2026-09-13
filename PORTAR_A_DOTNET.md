@@ -242,8 +242,8 @@ respetando mayúsculas/minúsculas. Errores (422/502) NO se envuelven: siguen co
         "urlPdfOficial": "https://busquedas.elperuano.pe/dispositivo/NL/2552687-1/pdf",
         "urlCuadernillo": "https://busquedas.elperuano.pe/cuadernillo/NL/20260910",
         "urlPortada": "https://elperuano.pe/NormasElperuano/PortadaFull/2026/09/10/2552687-1_Portada.jpg",
-        "rutaContenido": "/api/Agente/norma/2552687-1/contenido?tipo=NL",
-        "rutaPdf": "/api/Agente/norma/2552687-1/pdf?tipo=NL"
+        "rutaContenido": "/api/normas/2552687-1?tipo=NL&formato=texto",
+        "rutaPdf": "/api/normas/2552687-1/pdf?tipo=NL"
       }
     ]
   }
@@ -256,8 +256,10 @@ Reglas de esta respuesta:
 - `generadoEn` en hora de Perú (UTC-5), precisión de segundos.
 - `urlCuadernillo` = `https://busquedas.elperuano.pe/cuadernillo/{tipo}/{yyyymmdd}`
   (se toma del botón "Todo el cuadernillo" del listado; si no está, se construye).
-- `rutaContenido` / `rutaPdf` apuntan al servicio consumidor (`/api/Agente/norma/...`).
-  En publicaciones digitales, `rutaPdf` lleva además `&fecha=YYYY-MM-DD`.
+- `rutaContenido` / `rutaPdf` son rutas reales de ESTA API (`/api/normas/{id}?tipo=...&formato=texto`
+  y `/api/normas/{id}/pdf?tipo=...`), ya funcionales — solo hay que anteponer el
+  host donde corra. En publicaciones digitales, `rutaPdf` lleva además `&fecha=YYYY-MM-DD`.
+  (Si el port .NET expone otras rutas propias, regenera estos dos campos con las suyas.)
 
 ### `GET /api/normas/{id}?formato=texto`
 ```jsonc

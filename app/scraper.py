@@ -196,7 +196,7 @@ def _parse_articulo(art) -> dict | None:
     if not url_pdf_oficial:
         url_pdf_oficial = f"{BASE_BUSQUEDAS}/dispositivo/{tipo}/{norma_id}/pdf"
 
-    ruta_pdf = f"/api/Agente/norma/{norma_id}/pdf?tipo={tipo}"
+    ruta_pdf = f"/api/normas/{norma_id}/pdf?tipo={tipo}"
     if es_digital and fecha_iso:
         # Publicacion Digital: enlace directo al PDF (VistaDE.asp con id+fecha en base64)
         ref = base64.b64encode(f"{norma_id}{fecha_iso.replace('-', '')}".encode()).decode()
@@ -229,7 +229,7 @@ def _parse_articulo(art) -> dict | None:
         "url_pdf_oficial": url_pdf_oficial,
         "url_cuadernillo": url_cuadernillo,
         "url_portada": portada,
-        "ruta_contenido": f"/api/Agente/norma/{norma_id}/contenido?tipo={tipo}",
+        "ruta_contenido": f"/api/normas/{norma_id}?tipo={tipo}&formato=texto",
         "ruta_pdf": ruta_pdf,
     }
 

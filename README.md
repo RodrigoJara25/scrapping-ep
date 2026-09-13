@@ -96,8 +96,8 @@ curl "http://127.0.0.1:8000/api/normas?fecha=2026-09-03"
         "urlPdfOficial": "https://busquedas.elperuano.pe/dispositivo/NL/2550147-1/pdf",
         "urlCuadernillo": "https://busquedas.elperuano.pe/cuadernillo/NL/20260903",
         "urlPortada": "https://elperuano.pe/.../2550147-1_Portada.jpg",
-        "rutaContenido": "/api/Agente/norma/2550147-1/contenido?tipo=NL",
-        "rutaPdf": "/api/Agente/norma/2550147-1/pdf?tipo=NL"
+        "rutaContenido": "/api/normas/2550147-1?tipo=NL&formato=texto",
+        "rutaPdf": "/api/normas/2550147-1/pdf?tipo=NL"
       }
     ]
   }
@@ -111,9 +111,12 @@ Notas de esta respuesta:
 - `titulo` = `resolucion` (denominación de la norma). El texto descriptivo va en `sumilla`.
 - `fechaFin` toma el valor de `fechaConsulta` cuando no se pasa un rango.
 - `generadoEn` en hora de Perú (UTC-5).
-- `rutaContenido` / `rutaPdf` apuntan a las rutas del servicio consumidor
-  (`/api/Agente/norma/...`). En publicaciones digitales, `rutaPdf` incluye
-  `&fecha=YYYY-MM-DD` (lo necesita la descarga del PDF de esas municipales).
+- `rutaContenido` / `rutaPdf` son rutas **reales y llamables ya mismo**: apuntan
+  a los endpoints de esta misma API (`/api/normas/{id}?tipo=...&formato=texto`
+  y `/api/normas/{id}/pdf?tipo=...`). Solo hay que anteponerles el host donde
+  esté corriendo (local, Render, la VM, etc.). En publicaciones digitales,
+  `rutaPdf` incluye además `&fecha=YYYY-MM-DD` (lo necesita la descarga del PDF
+  de esas municipales).
 
 ### 2) `GET /api/normas/{norma_id}` — descarga individual
 
