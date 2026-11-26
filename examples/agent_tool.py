@@ -12,6 +12,7 @@ Contiene:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,8 @@ import requests
 
 API_BASE = "http://127.0.0.1:8000"
 TIMEOUT = 90
+# Si la API tiene configurada API_KEY, define la misma variable aqui.
+HEADERS = {"X-API-Key": os.environ["API_KEY"]} if os.environ.get("API_KEY") else {}
 
 
 # --------------------------------------------------------------------------- #
@@ -32,7 +35,7 @@ def listar_normas(fecha: str | None = None, fecha_fin: str | None = None) -> dic
         params["fecha"] = fecha
     if fecha_fin:
         params["fecha_fin"] = fecha_fin
-    r = requests.get(f"{API_BASE}/api/normas", params=params, timeout=TIMEOUT)
+    r = requests.get(f"{API_BASE}/api/normas", params=params, headers=HEADERS, timeout=TIMEOUT)
     r.raise_for_status()
     return r.json()
 
@@ -42,6 +45,7 @@ def obtener_texto_norma(norma_id: str, tipo: str = "NL") -> dict:
     r = requests.get(
         f"{API_BASE}/api/normas/{norma_id}",
         params={"tipo": tipo, "formato": "texto"},
+        headers=HEADERS,
         timeout=TIMEOUT,
     )
     r.raise_for_status()
@@ -53,6 +57,7 @@ def descargar_pdf_norma(norma_id: str, tipo: str = "NL", destino: str | None = N
     r = requests.get(
         f"{API_BASE}/api/normas/{norma_id}/pdf",
         params={"tipo": tipo},
+        headers=HEADERS,
         timeout=TIMEOUT,
     )
     r.raise_for_status()

@@ -14,17 +14,25 @@ Expone DOS funcionalidades pensadas para ser usadas como *tools* por un agente:
        - ?formato=pdf                  -> el PDF oficial (application/pdf).
      Atajo binario directo: GET /api/normas/{norma_id}/pdf
 
+Autenticacion: si la variable de entorno API_KEY esta definida, todos los
+endpoints de /api/* exigen la cabecera `X-API-Key` con ese valor (si falta o
+no coincide -> 401). /health y / son siempre publicos. Sin API_KEY la API
+funciona sin autenticacion (desarrollo local).
+
 Ejecutar:  python run.py       (o)   uvicorn app.main:app --reload
 Docs:      http://127.0.0.1:8000/docs
 """
 
 from __future__ import annotations
 
+import os
+import secrets
 from datetime import date
 
-from fastapi import FastAPI, HTTPException, Path, Query, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Path, Query, Response, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 
 from . import __version__, scraper
 from .models import ContenidoNorma, DataListado, NormaItem, RespuestaListado
@@ -70,6 +78,43 @@ def _validar_tipo(tipo: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Autenticacion por API key
+# --------------------------------------------------------------------------- #
+
+# auto_error=False: la falta de cabecera la decide verificar_api_key (asi, sin
+# API_KEY configurada, la API funciona sin autenticacion). Este objeto es el que
+# publica el esquema de seguridad apiKey/header/X-API-Key en /openapi.json.
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    scheme_name="ApiKeyAuth",
+    description="Clave de acceso. Obligatoria en /api/* cuando el servidor "
+    "tiene configurada la variable de entorno API_KEY.",
+    auto_error=False,
+)
+
+
+def verificar_api_key(api_key: str | None = Security(api_key_header)) -> None:
+    """Exige X-API-Key == API_KEY. Si API_KEY no esta definida, no exige nada."""
+    esperada = os.getenv("API_KEY")
+    if not esperada:
+        return
+    if not api_key or not secrets.compare_digest(api_key, esperada):
+        raise HTTPException(
+            status_code=401,
+            detail="API key ausente o invalida. Envia la cabecera X-API-Key.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+
+# Todo lo que cuelgue de este router (/api/*) queda protegido automaticamente.
+api = APIRouter(
+    prefix="/api",
+    dependencies=[Security(verificar_api_key)],
+    responses={401: {"description": "API key ausente o invalida (cabecera X-API-Key)."}},
+)
+
+
+# --------------------------------------------------------------------------- #
 # Endpoints
 # --------------------------------------------------------------------------- #
 
@@ -94,8 +139,8 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.get(
-    "/api/normas",
+@api.get(
+    "/normas",
     response_model=RespuestaListado,
     tags=["normas"],
     summary="Listar normas legales (del dia, de una fecha o de un rango)",
@@ -163,8 +208,8 @@ def listar_normas(
     )
 
 
-@app.get(
-    "/api/normas/{norma_id}",
+@api.get(
+    "/normas/{norma_id}",
     tags=["normas"],
     summary="Descarga individual de una norma (texto para resumir, o PDF)",
     responses={
@@ -219,8 +264,8 @@ def descargar_norma(
         raise HTTPException(status_code=502, detail=f"Error consultando El Peruano: {e}")
 
 
-@app.get(
-    "/api/normas/{norma_id}/pdf",
+@api.get(
+    "/normas/{norma_id}/pdf",
     tags=["normas"],
     summary="Atajo: PDF oficial de la norma (binario)",
     response_class=Response,
@@ -249,3 +294,7 @@ def descargar_norma_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
+
+
+# Debe ir despues de definir todas las rutas del router.
+app.include_router(api)

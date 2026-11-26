@@ -51,6 +51,24 @@ Documentación interactiva (Swagger): <http://127.0.0.1:8000/docs>
 
 ## API
 
+### Autenticación (API key)
+
+| Variable de entorno | Efecto |
+|---|---|
+| `API_KEY` **definida** | Todos los endpoints de `/api/*` exigen la cabecera `X-API-Key` con ese valor. Si falta o no coincide → `401`. |
+| `API_KEY` **sin definir** | La API funciona sin autenticación (desarrollo local). |
+
+`/health` y `/` (el índice) son **siempre públicos**. El esquema de seguridad se publica
+en `/openapi.json` como `apiKey` en el header `X-API-Key` (nombre del esquema:
+`ApiKeyAuth`), para que clientes como Foundry lo configuren automáticamente.
+
+```bash
+curl -H "X-API-Key: TU_CLAVE" "http://127.0.0.1:8000/api/normas"
+```
+
+El cliente de ejemplo (`examples/agent_tool.py`) y `tools/monitor_novedades.py`
+envían la cabecera solos si defines `API_KEY` en su entorno.
+
 ### 1) `GET /api/normas` — listado
 
 Lista las normas legales. Es la llamada que hace el agente **una vez al día**.
@@ -169,6 +187,7 @@ curl -L "http://127.0.0.1:8000/api/normas/2550147-1/pdf?tipo=NL"      -o norma.p
 
 | Código | Cuándo |
 |--------|--------|
+| `401` | `API_KEY` está configurada y la cabecera `X-API-Key` falta o no coincide. |
 | `422` | `fecha` mal formada, `tipo` distinto de `NL`/`EX`, `id` que no es `\d+-\d+`. |
 | `404` | La norma no existe (probados `NL` y `EX`) o no tiene PDF. |
 | `502` | El Peruano no respondió o cambió su HTML. |
@@ -286,9 +305,9 @@ estar corriendo (`python run.py`).
 
 ### Nota de seguridad
 
-La API no tiene autenticación: al publicarla, cualquiera con la URL puede
-consultarla. Como solo expone información pública de El Peruano el riesgo es
-bajo, pero si quieres cerrarla se puede añadir una cabecera `X-API-Key`.
+Al publicar la API, **define `API_KEY`** en el entorno de despliegue: sin ella,
+cualquiera con la URL puede consultar `/api/*`. Ver "Autenticación (API key)"
+más arriba.
 
 ## Notas
 

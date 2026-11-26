@@ -31,7 +31,10 @@ SNAP_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
 
 def _via_api(base: str, fecha: str | None) -> dict:
     url = f"{base}/api/normas" + (f"?fecha={fecha}" if fecha else "")
-    with urllib.request.urlopen(url, timeout=120) as r:
+    # Si la API exige clave, toma la misma variable API_KEY del entorno.
+    headers = {"X-API-Key": os.environ["API_KEY"]} if os.environ.get("API_KEY") else {}
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=120) as r:
         payload = json.load(r)
     return payload["data"] if "data" in payload else payload
 
